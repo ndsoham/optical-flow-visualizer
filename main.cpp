@@ -45,7 +45,7 @@ cv::Mat gradientToMat(const std::vector<float>& grad, int rows, int cols) {
     return result;
 }
 
-void computeGradients(const std::vector<float>& gray, int rows, int cols,
+void computeSpatialGradients(const std::vector<float>& gray, int rows, int cols,
                       std::vector<float>& Ix, std::vector<float>& Iy) {
     int kX[] = {-1, 0, 1, -2, 0, 2, -1, 0, 1};
     int kY[] = {-1, -2, -1, 0, 0, 0, 1, 2, 1};
@@ -78,11 +78,29 @@ void computeGradients(const std::vector<float>& gray, int rows, int cols,
     }
 }
 
+std::vector<float> computeTemporalGradient(const std::vector<float>& grayFrame1, 
+                                           const std::vector<float>& grayFrame2) {
+    std::vector<float> It;
+    It.reserve(grayFrame1.size());
+
+    for (int i = 0; i < grayFrame1.size(); i++) {
+        It.push_back(grayFrame2[i] - grayFrame1[i]);
+    }
+
+    return It;
+}
 
 
-int main() {
-    cv::Mat frame1 = cv::imread("../eval-data/Basketball/frame10.png");
-    cv::Mat frame2 = cv::imread("../eval-data/Basketball/frame11.png");
+
+int main(int argc, char* argv[]) {
+
+    if (argc != 3) {
+        std::cout << "usage: <filename> <frame1> <frame2>" << std::endl;
+        return 1;
+    }
+
+    cv::Mat frame1 = cv::imread(argv[1]);
+    cv::Mat frame2 = cv::imread(argv[2]);
 
     if (frame1.empty() || frame2.empty()) {
         std::cerr << "Failed to load images" << std::endl;
@@ -96,21 +114,17 @@ int main() {
 
     std::cout << "Type: " << frame1.type() << std::endl;
 
-    std::vector<float> grayScaled = toGrayscale(frame1);
-    cv::Mat grayFrame1 = toMat(grayScaled, frame1.rows, frame1.cols);
+    std::vector<float> grayFrame1 = toGrayscale(frame1);
+    std::vector<float> grayFrame2 = toGrayscale(frame2);
 
     std::vector<float> Ix;
-    Ix.reserve(grayScaled.size());
-   
     std::vector<float> Iy;
-    Iy.reserve(grayScaled.size());
 
-    computeGradients(grayScaled, frame1.rows, frame1.cols, Ix, Iy);
-    cv::Mat IxFrame1 = gradientToMat(Ix, frame1.rows, frame1.cols);
-    cv::Mat IyFrame1 = gradientToMat(Iy, frame1.rows, frame1.cols);
-
-    cv::imwrite("../eval-data/Basketball/IxFrame1.png", IxFrame1);
-    cv::imwrite("../eval-data/Basketball/IyFrame1.png", IyFrame1);
+    Ix.reserve(grayFrame1.size());
+    Iy.reserve(grayFrame1.size());
+    computeSpatialGradients(grayFrame1, frame1.rows, frame1.cols, Ix, Iy);
+    
+    std::vector<float> It = computeTemporalGradient(grayFrame1, grayFrame2);
 
     return 0;
 }
