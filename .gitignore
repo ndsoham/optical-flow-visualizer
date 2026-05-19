@@ -10,6 +10,11 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
+build_opencv/
+opencv/
+.DS_Store
+build/
+other-data/
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
