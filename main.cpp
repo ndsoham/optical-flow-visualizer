@@ -124,6 +124,12 @@ void lucasKanade(const std::vector<float>& Ix, const std::vector<float>&Iy,
                 v_i = (1/det) * (IxIy*IxIt  - IxIx*IyIt);
             }
 
+            float mag = std::sqrt(u_i*u_i + v_i*v_i);
+            if (mag < 0.3f) {
+                u_i = 0;
+                v_i = 0;
+            }
+
             u.push_back(u_i);
             v.push_back(v_i);
 
@@ -205,6 +211,6 @@ int main(int argc, char* argv[]) {
     cv::Mat flowBgr = flowToHSV(u, v, frame1.rows, frame1.cols);
     cv::imshow("Flow BGR", flowBgr);
     cv::waitKey(0);
-    cv::imwrite("FlowFrame1.png", flowBgr);
+    
     return 0;
 }
