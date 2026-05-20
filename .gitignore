@@ -18,6 +18,7 @@ other-data/
 eval-data/
 eval-data-full/
 .vscode/
+MPI-Sintel-testing/
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
