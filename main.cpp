@@ -131,6 +131,36 @@ void lucasKanade(const std::vector<float>& Ix, const std::vector<float>&Iy,
     }
 }
 
+cv::Mat flowToHSV(const std::vector<float>& u, const std::vector<float>&v,
+                  int rows, int cols){
+    cv::Mat hsv(rows, cols, CV_8UC3);
+
+    float maxMag = 0;
+    for (size_t i = 0; i < u.size(); i++) {
+        float mag = std::sqrt(u[i]*u[i] + v[i]*v[i]);
+        maxMag = std::max(maxMag, mag);
+    }
+
+    for (int row = 0; row < rows; row++) {
+        for (int col = 0; col < cols; col++) {
+            int i = row * cols + col;
+            float angle = std::atan2(v[i], u[i]);
+            float deg = angle * 180.0f / M_PI + 180.0f;
+            float mag = std::sqrt(u[i]*u[i] + v[i]*v[i]);
+            float normalizedMag = maxMag > 0 ? std::sqrt(mag / maxMag) : 0;
+
+            uint8_t* pixel = hsv.data + i*3;
+            pixel[0] = (uint8_t)(deg / 2.0f);
+            pixel[1] = 255;
+            pixel[2] = (uint8_t)(normalizedMag * 255);
+        }
+    }
+
+    cv::Mat bgr;
+    cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+    return bgr;
+}
+
 int main(int argc, char* argv[]) {
 
     if (argc != 3) {
@@ -172,10 +202,9 @@ int main(int argc, char* argv[]) {
 
     lucasKanade(Ix, Iy, It, frame1.rows, frame1.cols, 15, u, v);
 
-    auto [uMin, uMax] = std::minmax_element(u.begin(), u.end());
-    auto [vMin, vMax] = std::minmax_element(v.begin(), v.end());
-    std::cout << "u range: " << *uMin << " to " << *uMax << std::endl;
-    std::cout << "v range: " << *vMin << " to " << *vMax << std::endl;
-
+    cv::Mat flowBgr = flowToHSV(u, v, frame1.rows, frame1.cols);
+    cv::imshow("Flow BGR", flowBgr);
+    cv::waitKey(0);
+    cv::imwrite("FlowFrame1.png", flowBgr);
     return 0;
 }
