@@ -1,6 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include <filesystem>
+#include <string>
 
 std::vector<float> toGrayscale(const cv::Mat& img) {
     
@@ -169,48 +171,61 @@ cv::Mat flowToHSV(const std::vector<float>& u, const std::vector<float>&v,
 
 int main(int argc, char* argv[]) {
 
-    if (argc != 3) {
-        std::cout << "usage: <filename> <frame1> <frame2>" << std::endl;
+    if (argc != 2) {
+        std::cout << "usage: <filename> <frames directory>" << std::endl;
         return 1;
     }
 
-    cv::Mat frame1 = cv::imread(argv[1]);
-    cv::Mat frame2 = cv::imread(argv[2]);
+    std::vector<std::string> frameFiles;
 
-    if (frame1.empty() || frame2.empty()) {
-        std::cerr << "Failed to load images" << std::endl;
-        return 1;
+    for (const auto& entry : std::filesystem::directory_iterator(argv[1])) {
+        frameFiles.push_back(entry.path());
     }
 
-    std::cout << "Width: " << frame1.cols << std::endl;
-    std::cout << "Height: " << frame1.rows << std::endl;
+    std::sort(frameFiles.begin(), frameFiles.end());
 
-    std::cout << "Channels: " << frame1.channels() << std::endl;
-
-    std::cout << "Type: " << frame1.type() << std::endl;
-
+    cv::Mat frame1 = cv::imread(frameFiles.at(0));
     std::vector<float> grayFrame1 = toGrayscale(frame1);
-    std::vector<float> grayFrame2 = toGrayscale(frame2);
-
-    std::vector<float> Ix;
-    std::vector<float> Iy;
-
-    Ix.reserve(grayFrame1.size());
-    Iy.reserve(grayFrame1.size());
-    computeSpatialGradients(grayFrame1, frame1.rows, frame1.cols, Ix, Iy);
+    int nRows = frame1.rows;
+    int nCols = frame1.cols;
     
-    std::vector<float> It = computeTemporalGradient(grayFrame1, grayFrame2);
+    std::string outputPath = strcat(argv[1], "/output.mp4");
+    cv::VideoWriter writer(outputPath, 
+                           cv::VideoWriter::fourcc('m', 'p', '4', 'v'), 
+                           30.0, 
+                           cv::Size(nCols, nRows));
 
-    std::vector<float> u;
-    std::vector<float> v;
-    u.reserve(Ix.size());
-    v.reserve(Iy.size());
+    for (auto it = frameFiles.begin()+1; it != frameFiles.end(); it++) {
+        std::cout << "Processing " << *it << std::endl;
+        cv::Mat frame2 = cv::imread(*it);
 
-    lucasKanade(Ix, Iy, It, frame1.rows, frame1.cols, 15, u, v);
+        if (frame1.empty() || frame2.empty()) {
+            std::cerr << "Failed to load images" << std::endl;
+            return 1;
+        }
+        
+        std::vector<float> grayFrame2 = toGrayscale(frame2);
 
-    cv::Mat flowBgr = flowToHSV(u, v, frame1.rows, frame1.cols);
-    cv::imshow("Flow BGR", flowBgr);
-    cv::waitKey(0);
+        std::vector<float> Ix;
+        std::vector<float> Iy;
+
+        Ix.reserve(grayFrame1.size());
+        Iy.reserve(grayFrame1.size());
+        computeSpatialGradients(grayFrame1, nRows, nCols, Ix, Iy);
+        std::vector<float> It = computeTemporalGradient(grayFrame1, grayFrame2);
+
+        std::vector<float> u;
+        std::vector<float> v;
+        u.reserve(Ix.size());
+        v.reserve(Iy.size());
+
+        lucasKanade(Ix, Iy, It, nRows, nCols, 15, u, v);
+        cv::Mat flowBgr = flowToHSV(u, v, nRows, nCols);
+
+        writer.write(flowBgr);
+
+        grayFrame1 = grayFrame2;
+    }
     
     return 0;
 }

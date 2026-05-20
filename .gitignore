@@ -16,6 +16,8 @@ opencv/
 build/
 other-data/
 eval-data/
+eval-data-full/
+.vscode/
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
