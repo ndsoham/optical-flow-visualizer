@@ -3,6 +3,8 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 #include <string>
+#include <omp.h>
+#include <chrono>
 
 std::vector<float> toGrayscale(const cv::Mat& img) {
     
@@ -121,7 +123,8 @@ void lucasKanade(const std::vector<float>& Ix, const std::vector<float>&Iy,
     int half = windowSize/2;
 
     std::vector<float> gauss = gaussianKernel(windowSize, sigma);
-
+    
+    #pragma omp parallel for
     for (int row = 0; row < rows; row++) {
         for (int col = 0; col < cols; col++) {
 
@@ -156,10 +159,8 @@ void lucasKanade(const std::vector<float>& Ix, const std::vector<float>&Iy,
                 u_i = 0;
                 v_i = 0;
             }
-
-            u.push_back(u_i);
-            v.push_back(v_i);
-
+            u.at(idx(row, col)) = u_i;
+            v.at(idx(row, col)) = v_i;
         }
     }
 }
@@ -241,14 +242,16 @@ int main(int argc, char* argv[]) {
         computeSpatialGradients(grayFrame1, nRows, nCols, Ix, Iy);
         std::vector<float> It = computeTemporalGradient(grayFrame1, grayFrame2);
 
-        std::vector<float> u;
-        std::vector<float> v;
-        u.reserve(Ix.size());
-        v.reserve(Iy.size());
+        std::vector<float> u(Ix.size(), 0.0f);
+        std::vector<float> v(Iy.size(), 0.0f);
 
         int windowSize = 15;
         float sigma = (float)windowSize/6.0;
+        auto start = std::chrono::high_resolution_clock::now();
         lucasKanade(Ix, Iy, It, nRows, nCols, windowSize, u, v, sigma);
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = end - start;
+        std::cout << "LK Time: " << elapsed.count() << "s" << std::endl;
         cv::Mat flowBgr = flowToHSV(u, v, nRows, nCols);
 
         writer.write(flowBgr);
