@@ -92,12 +92,35 @@ std::vector<float> computeTemporalGradient(const std::vector<float>& grayFrame1,
     return It;
 }
 
+std::vector<float> gaussianKernel(int windowSize, float sigma) {
+    std::vector<float> kernel;
+    kernel.reserve(windowSize*windowSize);
+    int half = windowSize/2;
+
+    float sum = 0;
+    for (int dy = -half; dy <= half; dy++) {
+        for (int dx = -half; dx <= half; dx++) {
+            float weight = std::exp(-(dx*dx + dy*dy)/(2*sigma*sigma));
+            kernel.push_back(weight);
+            sum += weight;
+        }
+    }
+
+    for (float& w : kernel) {
+        w /= sum;
+    }
+
+    return kernel;
+}
+
 void lucasKanade(const std::vector<float>& Ix, const std::vector<float>&Iy,
                  const std::vector<float>& It, int rows, int cols, int windowSize,
-                 std::vector<float>& u, std::vector<float>& v) {
+                 std::vector<float>& u, std::vector<float>& v, float sigma) {
 
     auto idx = [&cols](int r, int c){return r*cols + c;};
     int half = windowSize/2;
+
+    std::vector<float> gauss = gaussianKernel(windowSize, sigma);
 
     for (int row = 0; row < rows; row++) {
         for (int col = 0; col < cols; col++) {
@@ -109,12 +132,14 @@ void lucasKanade(const std::vector<float>& Ix, const std::vector<float>&Iy,
                     int cX = std::min(cols-1, std::max(0, col+dx));
                     int cY = std::min(rows-1, std::max(0, row+dy));
                     int i = idx(cY, cX);
-                    
-                    IxIx += Ix.at(i)*Ix.at(i);
-                    IxIy += Ix.at(i)*Iy.at(i);
-                    IyIy += Iy.at(i)*Iy.at(i);
-                    IxIt += Ix.at(i)*It.at(i);
-                    IyIt += Iy.at(i)*It.at(i);
+                    int idx = (dy + half) * windowSize + (dx + half);
+                    float w = gauss.at(idx);
+
+                    IxIx += w * Ix.at(i) * Ix.at(i);
+                    IxIy += w * Ix.at(i) * Iy.at(i);
+                    IyIy += w * Iy.at(i) * Iy.at(i);
+                    IxIt += w * Ix.at(i) * It.at(i);
+                    IyIt += w * Iy.at(i) * It.at(i);
                 }
             }
 
@@ -169,10 +194,12 @@ cv::Mat flowToHSV(const std::vector<float>& u, const std::vector<float>&v,
     return bgr;
 }
 
+
+
 int main(int argc, char* argv[]) {
 
     if (argc != 2) {
-        std::cout << "usage: <filename> <frames directory>" << std::endl;
+        std::cout << "usage: <frames directory>" << std::endl;
         return 1;
     }
 
@@ -219,7 +246,9 @@ int main(int argc, char* argv[]) {
         u.reserve(Ix.size());
         v.reserve(Iy.size());
 
-        lucasKanade(Ix, Iy, It, nRows, nCols, 15, u, v);
+        int windowSize = 15;
+        float sigma = (float)windowSize/6.0;
+        lucasKanade(Ix, Iy, It, nRows, nCols, windowSize, u, v, sigma);
         cv::Mat flowBgr = flowToHSV(u, v, nRows, nCols);
 
         writer.write(flowBgr);
